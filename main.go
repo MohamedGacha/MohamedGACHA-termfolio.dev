@@ -1,12 +1,24 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"flag"
 	"fmt"
+	"log"
+	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/ssh"
+	"github.com/charmbracelet/wish"
+	"github.com/charmbracelet/wish/activeterm"
+	bm "github.com/charmbracelet/wish/bubbletea"
+	lm "github.com/charmbracelet/wish/logging"
 )
 
 // Colors
@@ -1031,10 +1043,50 @@ func splitLines(s string) []string {
 	return lines
 }
 
+func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
+	return initialModel(), []tea.ProgramOption{tea.WithAltScreen()}
+}
+
 func main() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Error: %v", err)
-		os.Exit(1)
+	sshMode := flag.Bool("ssh", false, "Start SSH server mode")
+	flag.Parse()
+
+	if *sshMode {
+		s, err := wish.NewServer(
+			wish.WithAddress(net.JoinHostPort("0.0.0.0", "23234")),
+			wish.WithHostKeyPath(".ssh/termfolio_ed25519"),
+			wish.WithMiddleware(
+				bm.Middleware(teaHandler),
+				activeterm.Middleware(),
+				lm.Middleware(),
+			),
+		)
+		if err != nil {
+			log.Fatalf("Could not create server: %v", err)
+		}
+
+		done := make(chan os.Signal, 1)
+		signal.Notify(done, os.Interrupt, syscall.SIGTERM)
+
+		log.Printf("Starting SSH server on 0.0.0.0:23234")
+		go func() {
+			if err := s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+				log.Fatalf("Server error: %v", err)
+			}
+		}()
+
+		<-done
+		log.Println("Shutting down SSH server...")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.Shutdown(ctx); err != nil {
+			log.Fatalf("Could not gracefully shut down server: %v", err)
+		}
+	} else {
+		p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			fmt.Printf("Error: %v", err)
+			os.Exit(1)
+		}
 	}
 }
