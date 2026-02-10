@@ -104,12 +104,12 @@ var translations = map[Lang]map[string]string{
 		"subtitle":       "Computer Science & Networks Engineer",
 		"about_title":    "About Me",
 		"bio_title":      "Biography",
-		"about_1":        "Passionate about building things that matter",
-		"about_2":        "— from scalable APIs to cybersecurity solutions.",
-		"about_3":        "",
-		"about_4":        "Currently at Gatewatcher, shipping the GCap NDR",
-		"about_5":        "product and open-source security projects",
-		"about_6":        "side by side.",
+		"about_1":        "Engineer passionate about building",
+		"about_2":        "robust, meaningful systems — from scalable",
+		"about_3":        "backend APIs to cybersecurity solutions.",
+		"about_4":        "Driven by curiosity and impact, with a focus",
+		"about_5":        "on system security and software quality.",
+		"about_6":        "Also into F1, gaming, and astrophysics.",
 		"exp_title":      "Experience",
 		"exp_scroll":     "(↑↓ to scroll)",
 		"mission":        "Mission:",
@@ -199,12 +199,12 @@ var translations = map[Lang]map[string]string{
 		"subtitle":       "Ingénieur en informatique et réseaux",
 		"about_title":    "À propos",
 		"bio_title":      "Biographie",
-		"about_1":        "Passionné par la création de solutions qui",
-		"about_2":        "comptent — des APIs robustes à la cybersécurité.",
-		"about_3":        "",
-		"about_4":        "Actuellement chez Gatewatcher, je développe le",
-		"about_5":        "produit NDR GCap et des projets open-source de",
-		"about_6":        "sécurité en parallèle.",
+		"about_1":        "Ingénieur passionné par la conception de",
+		"about_2":        "systèmes fiables et utiles — des APIs backend",
+		"about_3":        "scalables aux solutions de cybersécurité.",
+		"about_4":        "Animé par la curiosité et l'impact, avec un",
+		"about_5":        "intérêt pour la sécurité et la qualité logicielle.",
+		"about_6":        "Aussi passionné de F1, gaming et astrophysique.",
 		"exp_title":      "Expériences",
 		"exp_scroll":     "(↑↓ pour défiler)",
 		"mission":        "Mission:",
@@ -343,9 +343,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.screen {
 		case WelcomeScreen:
 			switch msg.String() {
-			case "ctrl+c", "q":
+			case "ctrl+c":
 				return m, tea.Quit
-			case " ", "enter":
+			default:
 				m.screen = PortfolioScreen
 				return m, nil
 			}
@@ -561,8 +561,13 @@ func (m model) View() string {
 		navbarPadding = 0
 	}
 
+	// Helper for clickable links (OSC 8 hyperlinks)
+	link := func(url, text string) string {
+		return fmt.Sprintf("\x1b]8;;%s\x07%s\x1b]8;;\x07", url, text)
+	}
+
 	// Site text box (top left)
-	siteText := " termfolio.dev "
+	siteText := " " + link("https://termfolio.dev", "termfolio.dev") + " "
 	siteLen := lipgloss.Width(siteText)
 	siteLeftPad := 1 // minimal dashes before site text
 	siteRightPad := leftPanelWidth - siteLeftPad - 2 - siteLen // -2 for ┤ and ├
@@ -613,11 +618,6 @@ func (m model) View() string {
 
 	// Horizontal separator line
 	separator := borderColor.Render(repeatString("─", leftPanelWidth-2))
-
-	// Helper for clickable links (OSC 8 hyperlinks)
-	link := func(url, text string) string {
-		return fmt.Sprintf("\x1b]8;;%s\x07%s\x1b]8;;\x07", url, text)
-	}
 
 	// Fixed width for labels to align values
 	labelWidth := 10
@@ -706,7 +706,7 @@ func (m model) View() string {
 	case 1: // Education
 		rightPanelContent = lipgloss.JoinVertical(
 			lipgloss.Left,
-			titleStyle.Render(m.t("edu_title")),
+			titleStyle.Render(m.t("edu_title"))+" "+mutedStyle.Render(m.t("exp_scroll")),
 			"",
 			titleStyle.Render("━━━ "+m.t("ensisa_degree")+" ━━━"),
 			contentStyle.Render(m.t("ensisa_school")),
@@ -732,10 +732,10 @@ func (m model) View() string {
 	case 2: // Projects
 		rightPanelContent = lipgloss.JoinVertical(
 			lipgloss.Left,
-			titleStyle.Render(m.t("proj_title")),
+			titleStyle.Render(m.t("proj_title"))+" "+mutedStyle.Render(m.t("exp_scroll")),
 			"",
 			titleStyle.Render("━━━ "+link("https://simplylovelysetups.com", "SimplyLovelySetups.com")+" ━━━"),
-			mutedStyle.Render("Sept 2024 - Present"),
+			mutedStyle.Render("Sept 2025 - Present"),
 			contentStyle.Render(m.t("sls_desc_1")),
 			contentStyle.Render(m.t("sls_desc_2")),
 			contentStyle.Render(m.t("sls_desc_3")),
@@ -783,7 +783,7 @@ func (m model) View() string {
 	case 3: // Skills
 		rightPanelContent = lipgloss.JoinVertical(
 			lipgloss.Left,
-			titleStyle.Render(m.t("skills_title")),
+			titleStyle.Render(m.t("skills_title"))+" "+mutedStyle.Render(m.t("exp_scroll")),
 			"",
 			titleStyle.Render("Languages")+"  "+contentStyle.Render("Python, Go, Rust, TypeScript, JavaScript, Java, C, F#"),
 			titleStyle.Render("Backend")+"    "+contentStyle.Render("Django, DRF, FastAPI, PostgreSQL, MongoDB, SQLAlchemy"),
@@ -988,7 +988,7 @@ func (m model) welcomeView() string {
 		line = animStyle.Render(cursor)
 	}
 
-	hint := mutedStyle.Render("Press Space or Enter to continue")
+	hint := mutedStyle.Render("Press any key to continue")
 
 	content := lipgloss.JoinVertical(
 		lipgloss.Center,

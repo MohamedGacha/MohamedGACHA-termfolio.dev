@@ -87,7 +87,7 @@ func GetResume() Resume {
 			{
 				Name: "SimplyLovelySetups.com",
 				Desc: "Site web gratuit de setups pour Assetto Corsa Competizione",
-				Date: "Sept 2024 - En cours",
+				Date: "Sept 2025 - En cours",
 				Tags: []string{"Python3", "FastAPI", "SQLAlchemy", "Alembic", "MongoDB", "NextJS", "Docker"},
 				URL:  "https://simplyLovelySetups.com",
 			},
