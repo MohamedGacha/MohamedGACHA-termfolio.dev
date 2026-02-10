@@ -990,14 +990,17 @@ func (m model) welcomeView() string {
 
 	hint := mutedStyle.Render("Press any key to continue")
 
+	centeredLine := lipgloss.PlaceHorizontal(width, lipgloss.Center, line)
+	centeredHint := lipgloss.PlaceHorizontal(width, lipgloss.Center, hint)
+
 	content := lipgloss.JoinVertical(
-		lipgloss.Center,
-		line,
+		lipgloss.Left,
+		centeredLine,
 		"",
-		hint,
+		centeredHint,
 	)
 
-	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
+	return lipgloss.PlaceVertical(height, lipgloss.Center, content)
 }
 
 func repeatString(s string, count int) string {
