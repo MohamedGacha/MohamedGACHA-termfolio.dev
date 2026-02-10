@@ -63,7 +63,7 @@ func GetResume() Resume {
 				Company:  "Gatewatcher",
 				Period:   "Oct 2025 - Sept 2026",
 				Location: "Paris, La Défense",
-				Desc:     "Développement d'outils CLI, contribution open-source (Suricata-verify), correction de bugs et mise en place de pipelines CI/CD.",
+				Desc:     "Développement et maintien de GCap (solution NDR) en parallèle de projets open-source de sécurité. Gestion d'infrastructure cloud et création d'outillage interne.",
 				Tags:     []string{"Python3", "Git", "GitHub", "Suricata", "Docker", "CI/CD", "Bash", "Linux"},
 			},
 			{
@@ -75,7 +75,7 @@ func GetResume() Resume {
 				Tags:     []string{"Python3", "Git", "GitHub", "Django", "PostgreSQL", "JWT", "Docker", "ReactJS", "Swagger", "AWS EC2"},
 			},
 			{
-				Title:    "Stage en Data Science",
+				Title:    "Data Engineer",
 				Company:  "Suez Digital Solutions",
 				Period:   "Juin 2024 - Août 2024",
 				Location: "Paris, La Défense",

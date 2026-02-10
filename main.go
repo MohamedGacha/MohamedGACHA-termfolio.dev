@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -39,6 +40,56 @@ const (
 	minHeight = 20
 )
 
+// Screen enum
+type Screen int
+
+const (
+	WelcomeScreen   Screen = iota
+	PortfolioScreen
+)
+
+// Animation phase enum
+type AnimPhase int
+
+const (
+	PhaseInitialBlink AnimPhase = iota // cursor blinks before anything starts
+	PhaseTypingDomain
+	PhaseBlinkFirst
+	PhaseCursorHome  // cursor jumps to start, pause before typing prefix
+	PhasePrepend
+	PhasePauseAfterPrepend // pause before cursor jumps to end
+	PhaseBlinkSecond
+	PhaseCursorEnd   // cursor jumps to end, pause before deleting
+	PhaseDelete
+	PhaseRestart
+)
+
+// Animation timing
+const (
+	tickInterval  = 80 * time.Millisecond
+	blinkInterval = 10  // ticks between blink toggles (~480ms)
+	blinkDuration = 62 // ticks for 5s of blinking
+	deleteChars   = 1  // characters deleted per tick (faster than typing)
+	restartPause  = 8  // ticks to pause before restarting
+	handMovePause    = 10 // ticks to pause after cursor jump (~800ms for hand repositioning)
+	initialBlinkTime = 12 // ticks for initial cursor blink (~1s)
+)
+
+// Animation text constants
+const (
+	domainText  = "termfolio.dev"
+	prependText = "Mohamed.Gacha@"
+)
+
+// Tick message for animation
+type tickMsg time.Time
+
+func doTick() tea.Cmd {
+	return tea.Tick(tickInterval, func(t time.Time) tea.Msg {
+		return tickMsg(t)
+	})
+}
+
 // Language type
 type Lang string
 
@@ -53,12 +104,12 @@ var translations = map[Lang]map[string]string{
 		"subtitle":       "Computer Science & Networks Engineer",
 		"about_title":    "About Me",
 		"bio_title":      "Biography",
-		"about_1":        "Backend Developer & Computer Science Engineer",
-		"about_2":        "passionate about building robust APIs and",
-		"about_3":        "scalable systems.",
-		"about_4":        "Currently working on cybersecurity solutions",
-		"about_5":        "at Gatewatcher, contributing to open-source",
-		"about_6":        "projects and developing CLI tools.",
+		"about_1":        "Passionate about building things that matter",
+		"about_2":        "— from scalable APIs to cybersecurity solutions.",
+		"about_3":        "",
+		"about_4":        "Currently at Gatewatcher, shipping the GCap NDR",
+		"about_5":        "product and open-source security projects",
+		"about_6":        "side by side.",
 		"exp_title":      "Experience",
 		"exp_scroll":     "(↑↓ to scroll)",
 		"mission":        "Mission:",
@@ -66,28 +117,50 @@ var translations = map[Lang]map[string]string{
 		"challenge":      "Challenge:",
 		"feedback":       "Feedback:",
 		"gw_role":        "Paris | Oct 2025 - Sept 2026",
-		"gw_mission_1":   "Working on GCap NDR solution. Managing cloud",
-		"gw_mission_2":   "infrastructure (Proxmox, Nutanix, Azure, AWS). Building",
-		"gw_mission_3":   "developer tools to automate repetitive tasks for the team.",
-		"gw_challenge":   "Learning cybersecurity from scratch with the team.",
-		"gw_feedback_1":  "Loved the challenge & growth! Great AI philosophy",
-		"gw_feedback_2":  "- using AI to sharpen skills while ensuring top quality.",
+		"gw_mission_1":   "Developing and maintaining GCap, Gatewatcher's NDR",
+		"gw_mission_2":   "(Network Detection & Response) solution, while working",
+		"gw_mission_3":   "on open-source security projects in parallel.",
+		"gw_mission_4":   "Managing cloud infrastructure (Proxmox, Nutanix, Azure,",
+		"gw_mission_5":   "AWS) and building internal tooling for the team.",
+		"gw_challenge":   "Ramped up on cybersecurity from the ground up.",
+		"gw_feedback_1":  "Thriving in a fast-paced environment with a strong",
+		"gw_feedback_2":  "engineering culture and thoughtful use of AI.",
 		"gw_title":       "Cybersecurity Engineer",
 		"etifak_role":    "Remote | Sept 2024 - Sept 2025",
-		"etifak_title":   "Backend Engineer",
+		"etifak_title":   "Backend Developer",
 		"etifak_mission_1": "Led backend development for B2B marketplace",
 		"etifak_mission_2": "at an early-stage startup. Built REST APIs, unit tests,",
 		"etifak_mission_3": "and managed AWS deployment.",
 		"etifak_challenge": "Self-taught many concepts as a junior dev.",
 		"etifak_feedback":  "Great team communication made workflow smooth!",
 		"suez_role":      "Paris | Jun - Aug 2024",
-		"suez_title":     "Data Engineer Intern",
-		"suez_mission_1": "Built intranet web app for data quality & cleaning.",
+		"suez_title":     "Data Engineer",
+		"suez_mission_1": "Internship: Built intranet web app for data quality & cleaning.",
 		"suez_mission_2": "Implemented deduplication using Levenshtein distance.",
 		"suez_feedback":  "First internship. Great Scrum team dynamics!",
 		"proj_title":     "Projects",
-		"sls_desc":       "Free setups for Assetto Corsa Competizione",
-		"mealpass_desc":  "Food distribution app for students",
+		"sls_desc_1":     "Community-driven platform providing free car setups",
+		"sls_desc_2":     "for Assetto Corsa Competizione. Full-stack project",
+		"sls_desc_3":     "with REST API, database management, and modern frontend.",
+		"sls_status":     "Status: Live & actively maintained",
+		"mealpass_desc_1": "Mobile app managing food distributions for students",
+		"mealpass_desc_2": "in need. QR-code based check-in system with real-time",
+		"mealpass_desc_3": "tracking and admin dashboard.",
+		"mealpass_status": "Status: Completed — volunteer project for an association",
+		"termfolio_desc_1": "Terminal-based portfolio built with Go and Bubble Tea.",
+		"termfolio_desc_2": "Interactive TUI with bilingual support, SSH access,",
+		"termfolio_desc_3": "and a custom-rendered UI with box-drawing characters.",
+		"termfolio_status":    "Status: Live & actively maintained — ",
+		"termfolio_highlight": "you're looking at it",
+		"vectorart_desc_1": "Illustrator-like vector drawing application with basic",
+		"vectorart_desc_2": "shape tools, layers, and export features.",
+		"vectorart_status": "Status: Completed — 1st year project at ENSISA",
+		"discordclone_desc_1": "Real-time messaging platform inspired by Discord",
+		"discordclone_desc_2": "with channels, user auth, and live chat.",
+		"discordclone_status": "Status: Completed — 1st year project at ENSISA",
+		"schoolmgmt_desc_1": "Management platform for students, courses, and grades",
+		"schoolmgmt_desc_2": "with admin dashboard and role-based access.",
+		"schoolmgmt_status": "Status: Completed — 1st year project at ENSISA",
 		"skills_title":   "Skills",
 		"contact_title":  "Contact",
 		"contact_reach":  "Feel free to reach out!",
@@ -95,6 +168,27 @@ var translations = map[Lang]map[string]string{
 		"contact_backend": "Backend Development",
 		"contact_cyber":  "Cybersecurity",
 		"contact_devops": "DevOps",
+		"edu_title":      "Education",
+		"ensisa_degree":  "Engineering Degree: Computer Science & Networks",
+		"ensisa_school":  "ENSISA - National School of Engineers of South Alsace",
+		"ensisa_period":  "Sept 2023 - Sept 2026",
+		"ensisa_loc":     "Mulhouse, France",
+		"ensisa_desc_1":  "Software development, databases, DevOps,",
+		"ensisa_desc_2":  "networks & security, AI and deep learning.",
+		"ensisa_desc_3":  "Hands-on projects in full-stack, cloud, and cybersecurity.",
+		"cpge_degree":    "Preparatory Classes MPSI",
+		"cpge_school":    "Carnot Prépas",
+		"cpge_period":    "Sept 2021 - Jul 2023",
+		"cpge_loc":       "Meknes, Morocco",
+		"cpge_desc_1":    "Intensive program in Mathematics, Physics and",
+		"cpge_desc_2":    "Engineering Sciences. Developed strong analytical",
+		"cpge_desc_3":    "thinking and problem-solving skills.",
+		"bac_degree":     "Baccalaureate - Science Math A",
+		"bac_school":     "Lycée Ajana",
+		"bac_period":     "2021",
+		"bac_loc":        "Meknes, Morocco",
+		"bac_desc_1":     "French Option. Strong foundation in mathematics",
+		"bac_desc_2":     "and scientific reasoning.",
 		"footer":         "q: Quit • ←→: Navigate • Tab: Language",
 		"email":          "Email",
 		"location":       "Location",
@@ -105,12 +199,12 @@ var translations = map[Lang]map[string]string{
 		"subtitle":       "Ingénieur en informatique et réseaux",
 		"about_title":    "À propos",
 		"bio_title":      "Biographie",
-		"about_1":        "Développeur Backend & Ingénieur Informatique",
-		"about_2":        "passionné par la création d'APIs robustes et",
-		"about_3":        "de systèmes évolutifs.",
-		"about_4":        "Actuellement en cybersécurité chez Gatewatcher,",
-		"about_5":        "contribution open-source et développement",
-		"about_6":        "d'outils CLI.",
+		"about_1":        "Passionné par la création de solutions qui",
+		"about_2":        "comptent — des APIs robustes à la cybersécurité.",
+		"about_3":        "",
+		"about_4":        "Actuellement chez Gatewatcher, je développe le",
+		"about_5":        "produit NDR GCap et des projets open-source de",
+		"about_6":        "sécurité en parallèle.",
 		"exp_title":      "Expériences",
 		"exp_scroll":     "(↑↓ pour défiler)",
 		"mission":        "Mission:",
@@ -118,12 +212,14 @@ var translations = map[Lang]map[string]string{
 		"challenge":      "Défi:",
 		"feedback":       "Avis:",
 		"gw_role":        "Paris | Oct 2025 - Sept 2026",
-		"gw_mission_1":   "Travail sur la solution NDR GCap. Gestion de",
-		"gw_mission_2":   "l'infrastructure cloud (Proxmox, Nutanix, Azure, AWS).",
-		"gw_mission_3":   "Création d'outils pour automatiser les tâches de l'équipe.",
-		"gw_challenge":   "Apprentissage de la cybersécurité avec l'équipe.",
-		"gw_feedback_1":  "J'ai adoré le défi et la croissance! Philosophie IA",
-		"gw_feedback_2":  "- utiliser l'IA pour améliorer les compétences.",
+		"gw_mission_1":   "Développement et maintien de GCap, la solution NDR",
+		"gw_mission_2":   "(Network Detection & Response) de Gatewatcher, en",
+		"gw_mission_3":   "parallèle de projets open-source de sécurité.",
+		"gw_mission_4":   "Gestion d'infrastructure cloud (Proxmox, Nutanix,",
+		"gw_mission_5":   "Azure, AWS) et création d'outillage interne.",
+		"gw_challenge":   "Montée en compétence cybersécurité en partant de zéro.",
+		"gw_feedback_1":  "Environnement stimulant avec une forte culture",
+		"gw_feedback_2":  "d'ingénierie et une utilisation réfléchie de l'IA.",
 		"gw_title":       "Ingénieur Cybersécurité",
 		"etifak_role":    "Remote | Sept 2024 - Sept 2025",
 		"etifak_title":   "Développeur Backend",
@@ -133,13 +229,33 @@ var translations = map[Lang]map[string]string{
 		"etifak_challenge": "Auto-apprentissage en tant que dev junior.",
 		"etifak_feedback":  "Excellente communication d'équipe!",
 		"suez_role":      "Paris | Juin - Août 2024",
-		"suez_title":     "Stagiaire Data Engineer",
-		"suez_mission_1": "Application intranet pour qualité des données.",
+		"suez_title":     "Data Engineer",
+		"suez_mission_1": "Stage : Application intranet pour qualité des données.",
 		"suez_mission_2": "Déduplication avec distance de Levenshtein.",
 		"suez_feedback":  "Premier stage. Super dynamique Scrum!",
 		"proj_title":     "Projets",
-		"sls_desc":       "Setups gratuits pour Assetto Corsa Competizione",
-		"mealpass_desc":  "App de distribution alimentaire pour étudiants",
+		"sls_desc_1":     "Plateforme communautaire proposant des setups gratuits",
+		"sls_desc_2":     "pour Assetto Corsa Competizione. Projet full-stack avec",
+		"sls_desc_3":     "API REST, gestion de base de données et frontend moderne.",
+		"sls_status":     "Statut : En ligne & maintenu activement",
+		"mealpass_desc_1": "Application mobile de gestion de distributions",
+		"mealpass_desc_2": "alimentaires pour étudiants précaires. Système de",
+		"mealpass_desc_3": "check-in par QR-code avec suivi en temps réel.",
+		"mealpass_status": "Statut : Terminé — projet bénévole pour une association",
+		"termfolio_desc_1": "Portfolio terminal construit avec Go et Bubble Tea.",
+		"termfolio_desc_2": "TUI interactive avec support bilingue, accès SSH,",
+		"termfolio_desc_3": "et rendu personnalisé avec des caractères box-drawing.",
+		"termfolio_status":    "Statut : En ligne & maintenu — ",
+		"termfolio_highlight": "vous le consultez en ce moment",
+		"vectorart_desc_1": "Application de dessin vectoriel type Illustrator avec",
+		"vectorart_desc_2": "outils de formes, calques et export.",
+		"vectorart_status": "Statut : Terminé — projet 1ère année ENSISA",
+		"discordclone_desc_1": "Plateforme de messagerie en temps réel inspirée de",
+		"discordclone_desc_2": "Discord avec salons, authentification et chat en direct.",
+		"discordclone_status": "Statut : Terminé — projet 1ère année ENSISA",
+		"schoolmgmt_desc_1": "Plateforme de gestion d'étudiants, cours et notes",
+		"schoolmgmt_desc_2": "avec tableau de bord admin et accès par rôles.",
+		"schoolmgmt_status": "Statut : Terminé — projet 1ère année ENSISA",
 		"skills_title":   "Compétences",
 		"contact_title":  "Contact",
 		"contact_reach":  "N'hésitez pas à me contacter!",
@@ -147,6 +263,27 @@ var translations = map[Lang]map[string]string{
 		"contact_backend": "Développement Backend",
 		"contact_cyber":  "Cybersécurité",
 		"contact_devops": "DevOps",
+		"edu_title":      "Parcours_Académique",
+		"ensisa_degree":  "Diplôme d'ingénieur : Informatique et Réseaux",
+		"ensisa_school":  "ENSISA - École Nationale Supérieure d'Ingénieurs Sud-Alsace",
+		"ensisa_period":  "Sept 2023 - Sept 2026",
+		"ensisa_loc":     "Mulhouse, France",
+		"ensisa_desc_1":  "Développement logiciel, bases de données, DevOps,",
+		"ensisa_desc_2":  "réseaux et sécurité, IA et deep learning.",
+		"ensisa_desc_3":  "Projets pratiques en full-stack, cloud et cybersécurité.",
+		"cpge_degree":    "Classes Préparatoires MPSI",
+		"cpge_school":    "Carnot Prépas",
+		"cpge_period":    "Sept 2021 - Juil 2023",
+		"cpge_loc":       "Meknès, Maroc",
+		"cpge_desc_1":    "Programme intensif en Mathématiques, Physique et",
+		"cpge_desc_2":    "Sciences de l'Ingénieur. Développement de la rigueur",
+		"cpge_desc_3":    "analytique et des capacités de résolution de problèmes.",
+		"bac_degree":     "Baccalauréat - Option Science Math A",
+		"bac_school":     "Lycée Ajana",
+		"bac_period":     "2021",
+		"bac_loc":        "Meknès, Maroc",
+		"bac_desc_1":     "Option Française. Solide formation en mathématiques",
+		"bac_desc_2":     "et raisonnement scientifique.",
 		"footer":         "q: Quitter • ←→: Naviguer • Tab: Langue",
 		"email":          "Email",
 		"location":       "Lieu",
@@ -164,15 +301,27 @@ type model struct {
 	width  int
 	height int
 	cursor int
+	scroll int
 	lang   Lang
+
+	// Welcome screen animation
+	screen    Screen
+	animPhase AnimPhase
+	animPos   int
+	animTicks int
+	cursorOn  bool
 }
+
+// Tracks max scroll from the last render frame
+var lastMaxScroll int
 
 func initialModel() model {
 	return model{
-		width:  80,
-		height: 24,
-		cursor: 0,
-		lang:   EN,
+		width:    80,
+		height:   24,
+		cursor:   0,
+		lang:     EN,
+		cursorOn: true,
 	}
 }
 
@@ -185,29 +334,49 @@ func (m model) t(key string) string {
 }
 
 func (m model) Init() tea.Cmd {
-	return nil
+	return doTick()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		switch msg.String() {
-		case "ctrl+c", "q":
-			return m, tea.Quit
-		case "left", "h":
-			if m.cursor > 0 {
-				m.cursor--
+		switch m.screen {
+		case WelcomeScreen:
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case " ", "enter":
+				m.screen = PortfolioScreen
+				return m, nil
 			}
-		case "right", "l":
-			if m.cursor < 2 {
-				m.cursor++
-			}
-		case "tab":
-			// Toggle language
-			if m.lang == EN {
-				m.lang = FR
-			} else {
-				m.lang = EN
+		case PortfolioScreen:
+			switch msg.String() {
+			case "ctrl+c", "q":
+				return m, tea.Quit
+			case "left", "h":
+				if m.cursor > 0 {
+					m.cursor--
+					m.scroll = 0
+				}
+			case "right", "l":
+				if m.cursor < 3 {
+					m.cursor++
+					m.scroll = 0
+				}
+			case "up", "k":
+				if m.scroll > 0 {
+					m.scroll--
+				}
+			case "down", "j":
+				if m.scroll < lastMaxScroll {
+					m.scroll++
+				}
+			case "tab":
+				if m.lang == EN {
+					m.lang = FR
+				} else {
+					m.lang = EN
+				}
 			}
 		}
 
@@ -215,12 +384,124 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 
+	case tickMsg:
+		if m.screen == WelcomeScreen {
+			advanceAnimation(&m)
+			return m, doTick()
+		}
 	}
 
 	return m, nil
 }
 
+func advanceAnimation(m *model) {
+	m.animTicks++
+
+	switch m.animPhase {
+	case PhaseInitialBlink:
+		if m.animTicks%blinkInterval == 0 {
+			m.cursorOn = !m.cursorOn
+		}
+		if m.animTicks >= initialBlinkTime {
+			m.animPhase = PhaseTypingDomain
+			m.animTicks = 0
+			m.animPos = 0
+			m.cursorOn = true
+		}
+
+	case PhaseTypingDomain:
+		if m.animPos < len(domainText) {
+			m.animPos++
+			m.cursorOn = true
+		} else {
+			m.animPhase = PhaseBlinkFirst
+			m.animTicks = 0
+			m.cursorOn = true
+		}
+
+	case PhaseBlinkFirst:
+		if m.animTicks%blinkInterval == 0 {
+			m.cursorOn = !m.cursorOn
+		}
+		if m.animTicks >= blinkDuration {
+			m.animPhase = PhaseCursorHome
+			m.animTicks = 0
+			m.animPos = 0 // cursor jumps to start
+			m.cursorOn = true
+		}
+
+	case PhaseCursorHome:
+		// Pause after Home key — hands moving from Alt+Arrow to letter keys
+		if m.animTicks >= handMovePause {
+			m.animPhase = PhasePrepend
+			m.animTicks = 0
+			m.animPos = 0
+			m.cursorOn = true
+		}
+
+	case PhasePrepend:
+		if m.animPos < len(prependText) {
+			m.animPos++
+			m.cursorOn = true
+		} else {
+			m.animPhase = PhasePauseAfterPrepend
+			m.animTicks = 0
+			m.cursorOn = true
+		}
+
+	case PhasePauseAfterPrepend:
+		// Pause after typing prefix — before cursor jumps to end
+		if m.animTicks >= handMovePause {
+			m.animPhase = PhaseBlinkSecond
+			m.animTicks = 0
+			m.cursorOn = true
+		}
+
+	case PhaseBlinkSecond:
+		if m.animTicks%blinkInterval == 0 {
+			m.cursorOn = !m.cursorOn
+		}
+		if m.animTicks >= blinkDuration {
+			m.animPhase = PhaseCursorEnd
+			m.animTicks = 0
+			m.animPos = len(prependText) + len(domainText) // cursor jumps to end
+			m.cursorOn = true
+		}
+
+	case PhaseCursorEnd:
+		// Pause after End key — hands moving from Alt+Arrow to Backspace
+		if m.animTicks >= handMovePause {
+			m.animPhase = PhaseDelete
+			m.animTicks = 0
+			m.cursorOn = true
+		}
+
+	case PhaseDelete:
+		if m.animPos > 0 {
+			m.animPos -= deleteChars
+			if m.animPos < 0 {
+				m.animPos = 0
+			}
+		} else {
+			m.animPhase = PhaseRestart
+			m.animTicks = 0
+		}
+
+	case PhaseRestart:
+		if m.animTicks >= restartPause {
+			m.animPhase = PhaseTypingDomain
+			m.animTicks = 0
+			m.animPos = 0
+			m.cursorOn = true
+		}
+	}
+}
+
 func (m model) View() string {
+	if m.screen == WelcomeScreen {
+		return m.welcomeView()
+	}
+
 	// Calculate dimensions with minimums
 	width := m.width
 	height := m.height
@@ -236,7 +517,7 @@ func (m model) View() string {
 	innerWidth := width - 4
 
 	// Menu items horizontal
-	menuItems := []string{"Experience", "Projects", "Skills"}
+	menuItems := []string{"Experience", m.t("edu_title"), "Projects", "Skills"}
 	var menuDisplay []string
 	for i, item := range menuItems {
 		if i == m.cursor {
@@ -269,7 +550,7 @@ func (m model) View() string {
 	borderColor := lipgloss.NewStyle().Foreground(primaryColor)
 
 	// Panel widths for vertical split (30% left, 70% right)
-	leftPanelWidth := innerWidth * 30 / 100
+	leftPanelWidth := innerWidth*30/100 + 1
 	rightPanelWidth := innerWidth - leftPanelWidth - 1 // -1 for the middle │
 
 	// Calculate navbar position (top right of overall view)
@@ -398,6 +679,8 @@ func (m model) View() string {
 			mutedStyle.Render(m.t("mission"))+" "+contentStyle.Render(m.t("gw_mission_1")),
 			contentStyle.Render(m.t("gw_mission_2")),
 			contentStyle.Render(m.t("gw_mission_3")),
+			contentStyle.Render(m.t("gw_mission_4")),
+			contentStyle.Render(m.t("gw_mission_5")),
 			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Python, Ansible, Docker, Bash, Linux, CI/CD"),
 			mutedStyle.Render(m.t("challenge"))+" "+contentStyle.Render(m.t("gw_challenge")),
 			mutedStyle.Render(m.t("feedback"))+" "+contentStyle.Render(m.t("gw_feedback_1")),
@@ -416,25 +699,88 @@ func (m model) View() string {
 			contentStyle.Render(m.t("suez_role")),
 			mutedStyle.Render(m.t("mission"))+" "+contentStyle.Render(m.t("suez_mission_1")),
 			contentStyle.Render(m.t("suez_mission_2")),
-			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Python, Streamlit, Pandas, HTML/CSS, Azure"),
+			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Python, Streamlit, Pandas, asyncio, Azure DevOps"),
 			mutedStyle.Render(m.t("feedback"))+" "+contentStyle.Render(m.t("suez_feedback")),
 		)
 
-	case 1: // Projects
+	case 1: // Education
+		rightPanelContent = lipgloss.JoinVertical(
+			lipgloss.Left,
+			titleStyle.Render(m.t("edu_title")),
+			"",
+			titleStyle.Render("━━━ "+m.t("ensisa_degree")+" ━━━"),
+			contentStyle.Render(m.t("ensisa_school")),
+			mutedStyle.Render(m.t("ensisa_period")+" | "+m.t("ensisa_loc")),
+			contentStyle.Render(m.t("ensisa_desc_1")),
+			contentStyle.Render(m.t("ensisa_desc_2")),
+			contentStyle.Render(m.t("ensisa_desc_3")),
+			"",
+			titleStyle.Render("━━━ "+m.t("cpge_degree")+" ━━━"),
+			contentStyle.Render(m.t("cpge_school")),
+			mutedStyle.Render(m.t("cpge_period")+" | "+m.t("cpge_loc")),
+			contentStyle.Render(m.t("cpge_desc_1")),
+			contentStyle.Render(m.t("cpge_desc_2")),
+			contentStyle.Render(m.t("cpge_desc_3")),
+			"",
+			titleStyle.Render("━━━ "+m.t("bac_degree")+" ━━━"),
+			contentStyle.Render(m.t("bac_school")),
+			mutedStyle.Render(m.t("bac_period")+" | "+m.t("bac_loc")),
+			contentStyle.Render(m.t("bac_desc_1")),
+			contentStyle.Render(m.t("bac_desc_2")),
+		)
+
+	case 2: // Projects
 		rightPanelContent = lipgloss.JoinVertical(
 			lipgloss.Left,
 			titleStyle.Render(m.t("proj_title")),
 			"",
-			titleStyle.Render("SimplyLovelySetups.com"),
-			contentStyle.Render("  "+m.t("sls_desc")),
-			contentStyle.Render("  FastAPI, MongoDB, NextJS, Docker"),
+			titleStyle.Render("━━━ "+link("https://simplylovelysetups.com", "SimplyLovelySetups.com")+" ━━━"),
+			mutedStyle.Render("Sept 2024 - Present"),
+			contentStyle.Render(m.t("sls_desc_1")),
+			contentStyle.Render(m.t("sls_desc_2")),
+			contentStyle.Render(m.t("sls_desc_3")),
+			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("FastAPI, SQLAlchemy, MongoDB, NextJS, Docker"),
+			mutedStyle.Render(m.t("sls_status")),
 			"",
-			titleStyle.Render("MealPass"),
-			contentStyle.Render("  "+m.t("mealpass_desc")),
-			contentStyle.Render("  Django, PostgreSQL, Flutter"),
+			titleStyle.Render("━━━ "+link("https://termfolio.dev", "termfolio.dev")+" ━━━"),
+			mutedStyle.Render("Feb 2026 - Present"),
+			contentStyle.Render(m.t("termfolio_desc_1")),
+			contentStyle.Render(m.t("termfolio_desc_2")),
+			contentStyle.Render(m.t("termfolio_desc_3")),
+			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Go, Bubble Tea, Lipgloss, SSH (Wish)"),
+			mutedStyle.Render(m.t("termfolio_status"))+lipgloss.NewStyle().Background(primaryColor).Foreground(lipgloss.Color("#000000")).Bold(true).Render(" "+m.t("termfolio_highlight")+" "),
+			"",
+			titleStyle.Render("━━━ MealPass ━━━"),
+			mutedStyle.Render("Mars 2025"),
+			contentStyle.Render(m.t("mealpass_desc_1")),
+			contentStyle.Render(m.t("mealpass_desc_2")),
+			contentStyle.Render(m.t("mealpass_desc_3")),
+			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Django, PostgreSQL, Flutter, Dart, Docker"),
+			mutedStyle.Render(m.t("mealpass_status")),
+			"",
+			titleStyle.Render("━━━ NeoShape ━━━"),
+			mutedStyle.Render("2024"),
+			contentStyle.Render(m.t("vectorart_desc_1")),
+			contentStyle.Render(m.t("vectorart_desc_2")),
+			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Java, JavaFX"),
+			mutedStyle.Render(m.t("vectorart_status")),
+			"",
+			titleStyle.Render("━━━ Nexus ━━━"),
+			mutedStyle.Render("2024"),
+			contentStyle.Render(m.t("discordclone_desc_1")),
+			contentStyle.Render(m.t("discordclone_desc_2")),
+			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Python, Django, WebSocket, HTML/CSS"),
+			mutedStyle.Render(m.t("discordclone_status")),
+			"",
+			titleStyle.Render("━━━ NewMoodle ━━━"),
+			mutedStyle.Render("2024"),
+			contentStyle.Render(m.t("schoolmgmt_desc_1")),
+			contentStyle.Render(m.t("schoolmgmt_desc_2")),
+			mutedStyle.Render(m.t("stack"))+" "+contentStyle.Render("Python, Django, PostgreSQL, HTML/CSS"),
+			mutedStyle.Render(m.t("schoolmgmt_status")),
 		)
 
-	case 2: // Skills
+	case 3: // Skills
 		rightPanelContent = lipgloss.JoinVertical(
 			lipgloss.Left,
 			titleStyle.Render(m.t("skills_title")),
@@ -458,6 +804,17 @@ func (m model) View() string {
 	rightLines := splitLines(rightContent)
 
 	contentHeight := height - 7 // Leave space for top (3 lines) + bottom (3 lines) + margin
+
+	// Clamp scroll to valid range
+	maxScroll := len(rightLines) - contentHeight
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	lastMaxScroll = maxScroll
+	if m.scroll > maxScroll {
+		m.scroll = maxScroll
+	}
+
 	var framedContent string
 	for i := 0; i < contentHeight; i++ {
 		leftLine := ""
@@ -465,8 +822,9 @@ func (m model) View() string {
 		if i < len(leftLines) {
 			leftLine = leftLines[i]
 		}
-		if i < len(rightLines) {
-			rightLine = rightLines[i]
+		rightIdx := i + m.scroll
+		if rightIdx < len(rightLines) {
+			rightLine = rightLines[rightIdx]
 		}
 		// Pad lines to correct width
 		leftLineWidth := lipgloss.Width(leftLine)
@@ -556,6 +914,88 @@ func (m model) View() string {
 
 	// Center horizontally
 	return lipgloss.PlaceHorizontal(width, lipgloss.Center, fullView)
+}
+
+// cursorBlock renders a character with inverted colors to simulate a terminal block cursor.
+func cursorBlock(ch string) string {
+	return lipgloss.NewStyle().
+		Background(primaryColor).
+		Foreground(lipgloss.Color("#000000")).
+		Bold(true).
+		Render(ch)
+}
+
+func (m model) welcomeView() string {
+	width := m.width
+	height := m.height
+	if width < minWidth {
+		width = minWidth
+	}
+	if height < minHeight {
+		height = minHeight
+	}
+
+	// Cursor character
+	cursor := " "
+	if m.cursorOn {
+		cursor = "█"
+	}
+
+	// Style the text
+	animStyle := lipgloss.NewStyle().
+		Foreground(primaryColor).
+		Bold(true)
+
+	// Build display with cursor at the correct insertion point
+	fullText := prependText + domainText
+	var line string
+
+	switch m.animPhase {
+	case PhaseInitialBlink:
+		line = animStyle.Render(cursor)
+	case PhaseTypingDomain:
+		line = animStyle.Render(domainText[:m.animPos] + cursor)
+	case PhaseBlinkFirst:
+		line = animStyle.Render(domainText + cursor)
+	case PhaseCursorHome:
+		if m.cursorOn {
+			line = cursorBlock("t") + animStyle.Render(domainText[1:]+" ")
+		} else {
+			line = animStyle.Render(domainText + " ")
+		}
+	case PhasePrepend:
+		if m.cursorOn {
+			line = animStyle.Render(prependText[:m.animPos]) + cursorBlock("t") + animStyle.Render(domainText[1:]+" ")
+		} else {
+			line = animStyle.Render(prependText[:m.animPos] + domainText + " ")
+		}
+	case PhasePauseAfterPrepend:
+		if m.cursorOn {
+			line = animStyle.Render(prependText) + cursorBlock("t") + animStyle.Render(domainText[1:]+" ")
+		} else {
+			line = animStyle.Render(fullText + " ")
+		}
+	case PhaseBlinkSecond:
+		line = animStyle.Render(fullText + cursor)
+	case PhaseCursorEnd:
+		// Cursor jumped to end, waiting before deleting
+		line = animStyle.Render(fullText + cursor)
+	case PhaseDelete:
+		line = animStyle.Render(fullText[:m.animPos] + cursor)
+	case PhaseRestart:
+		line = animStyle.Render(cursor)
+	}
+
+	hint := mutedStyle.Render("Press Space or Enter to continue")
+
+	content := lipgloss.JoinVertical(
+		lipgloss.Center,
+		line,
+		"",
+		hint,
+	)
+
+	return lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, content)
 }
 
 func repeatString(s string, count int) string {
