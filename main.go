@@ -785,11 +785,13 @@ func (m model) View() string {
 			lipgloss.Left,
 			titleStyle.Render(m.t("skills_title")),
 			"",
-			titleStyle.Render("Backend")+"  "+contentStyle.Render("Python, Django, FastAPI, PostgreSQL"),
-			titleStyle.Render("Frontend")+" "+contentStyle.Render("JavaScript, ReactJS, NextJS, HTML/CSS"),
-			titleStyle.Render("DevOps")+"   "+contentStyle.Render("Docker, AWS, Azure, CI/CD, Linux"),
-			titleStyle.Render("Tools")+"    "+contentStyle.Render("Git, Suricata, Streamlit, Pandas"),
-			titleStyle.Render("Other")+"    "+contentStyle.Render("Java, C, C#, F#, Bash"),
+			titleStyle.Render("Languages")+"  "+contentStyle.Render("Python, Go, Rust, TypeScript, JavaScript, Java, C, F#"),
+			titleStyle.Render("Backend")+"    "+contentStyle.Render("Django, DRF, FastAPI, PostgreSQL, MongoDB, SQLAlchemy"),
+			titleStyle.Render("Frontend")+"   "+contentStyle.Render("React.js, NextJS, Flutter, HTML/CSS"),
+			titleStyle.Render("DevOps")+"     "+contentStyle.Render("Docker, AWS, Azure, CI/CD, Linux, Ansible, Bash"),
+			titleStyle.Render("Security")+"   "+contentStyle.Render("Suricata, Network Analysis, Selenium, Beautiful Soup"),
+			titleStyle.Render("Data")+"       "+contentStyle.Render("Pandas, Streamlit, Azure ML"),
+			titleStyle.Render("Tools")+"      "+contentStyle.Render("Git, Scrum/Agile, Code Review, REST APIs"),
 		)
 
 	}
