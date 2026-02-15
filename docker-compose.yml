@@ -1,0 +1,16 @@
+services:
+  termfolio:
+    build: .
+    ports:
+      - "22:2222"
+    volumes:
+      - hostkey:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "2222"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  hostkey:

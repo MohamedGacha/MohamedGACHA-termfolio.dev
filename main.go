@@ -5,7 +5,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/signal"
@@ -14,6 +13,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/log"
 	"github.com/charmbracelet/ssh"
 	"github.com/charmbracelet/wish"
 	"github.com/charmbracelet/wish/activeterm"
@@ -1043,50 +1043,60 @@ func splitLines(s string) []string {
 	return lines
 }
 
-func teaHandler(s ssh.Session) (tea.Model, []tea.ProgramOption) {
-	return initialModel(), []tea.ProgramOption{tea.WithAltScreen()}
+func teaHandler(sess ssh.Session) (tea.Model, []tea.ProgramOption) {
+	pty, _, _ := sess.Pty()
+	m := initialModel()
+	m.width = pty.Window.Width
+	m.height = pty.Window.Height
+	return m, []tea.ProgramOption{tea.WithAltScreen()}
 }
 
 func main() {
-	sshMode := flag.Bool("ssh", false, "Start SSH server mode")
+	serve := flag.Bool("serve", false, "Start SSH server mode")
+	host := flag.String("host", "0.0.0.0", "SSH server host")
+	port := flag.String("port", "2222", "SSH server port")
+	key := flag.String("key", "/app/data/hostkey", "Path to host key")
 	flag.Parse()
 
-	if *sshMode {
-		s, err := wish.NewServer(
-			wish.WithAddress(net.JoinHostPort("0.0.0.0", "23234")),
-			wish.WithHostKeyPath(".ssh/termfolio_ed25519"),
-			wish.WithMiddleware(
-				bm.Middleware(teaHandler),
-				activeterm.Middleware(),
-				lm.Middleware(),
-			),
-		)
-		if err != nil {
-			log.Fatalf("Could not create server: %v", err)
-		}
-
-		done := make(chan os.Signal, 1)
-		signal.Notify(done, os.Interrupt, syscall.SIGTERM)
-
-		log.Printf("Starting SSH server on 0.0.0.0:23234")
-		go func() {
-			if err := s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
-				log.Fatalf("Server error: %v", err)
-			}
-		}()
-
-		<-done
-		log.Println("Shutting down SSH server...")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := s.Shutdown(ctx); err != nil {
-			log.Fatalf("Could not gracefully shut down server: %v", err)
-		}
-	} else {
+	if !*serve {
 		p := tea.NewProgram(initialModel(), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			fmt.Printf("Error: %v", err)
 			os.Exit(1)
 		}
+		return
+	}
+
+	s, err := wish.NewServer(
+		wish.WithAddress(net.JoinHostPort(*host, *port)),
+		wish.WithHostKeyPath(*key),
+		wish.WithMiddleware(
+			bm.Middleware(teaHandler),
+			activeterm.Middleware(),
+			lm.Middleware(),
+		),
+	)
+	if err != nil {
+		log.Error("Could not start server", "error", err)
+		os.Exit(1)
+	}
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGTERM)
+
+	log.Info("Starting SSH server", "host", *host, "port", *port)
+	go func() {
+		if err := s.ListenAndServe(); err != nil && !errors.Is(err, ssh.ErrServerClosed) {
+			log.Error("Server error", "error", err)
+			done <- nil
+		}
+	}()
+
+	<-done
+	log.Info("Shutting down SSH server...")
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	if err := s.Shutdown(ctx); err != nil {
+		log.Error("Shutdown error", "error", err)
 	}
 }
